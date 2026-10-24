@@ -1,0 +1,809 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f7a6b">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Daily Roadmap">
+<title>Daily Roadmap</title>
+<style>
+:root{--bg:#f2f4f3;--surface:#fff;--ink:#1d2a33;--muted:#66747e;--line:#dde3e1;--accent:#4f7a6b;--accent-ink:#fff;--soft:#e6efeb;--warn:#a5532f;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#12171a;--surface:#1a2125;--ink:#e5eaec;--muted:#a1adb4;--line:#2a3338;--accent:#8db8a6;--accent-ink:#0f1f19;--soft:#212c2b;--warn:#d98d68;color-scheme:dark}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:640px;margin:0 auto;padding:20px 16px 80px}h1{font-size:1.5rem;font-weight:650;letter-spacing:-.01em;margin:8px 0 2px}.sub{color:var(--muted);margin:0 0 20px;font-size:.95rem}
+nav{display:flex;gap:4px;background:var(--soft);padding:4px;border-radius:10px;margin-bottom:20px}nav button{flex:1;border:0;background:none;color:var(--muted);padding:9px;border-radius:7px;font:inherit;font-weight:550;cursor:pointer}nav button[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}.rname{color:var(--muted);font-size:.9rem;margin:0}.topic{font-size:1.2rem;font-weight:600;margin:4px 0 14px;line-height:1.35}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button.btn,label.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 16px;border-radius:8px;font:inherit;font-weight:550;cursor:pointer;display:inline-block}button.primary,label.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}button.quiet{border:0;background:none;color:var(--muted);font:inherit;cursor:pointer;padding:6px 8px;border-radius:6px}
+button:focus-visible,input:focus-visible,summary:focus-visible,label.btn:focus-within{outline:2px solid var(--accent);outline-offset:2px}.done-tag{color:var(--accent);font-weight:600}.drop{border:1.5px dashed var(--line);border-radius:12px;padding:22px 16px;text-align:center;margin-bottom:16px;color:var(--muted)}.drop input{display:none}.drop p{margin:0 0 12px}
+details{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:12px}summary{padding:14px 16px;cursor:pointer;font-weight:600;list-style:none}summary::-webkit-details-marker{display:none}summary small{display:block;color:var(--muted);font-weight:400}.body{padding:0 16px 16px;border-top:1px solid var(--line)}
+.fields{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}.fields label{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;gap:4px}input[type=text],input[type=time],input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.entries{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px}.entry{display:grid;grid-template-columns:92px 1fr;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line);font-size:.9rem}.entry:last-child{border-bottom:0}.entry .d{color:var(--muted)}.entry input{width:100%;padding:5px 8px;font-size:.9rem}.entry.st-done{opacity:.55}
+.empty{color:var(--muted);text-align:center;padding:36px 8px}
+.create-room{display:flex;gap:8px;margin:22px 0 18px;flex-wrap:wrap}.create-room input{flex:1;min-width:180px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.room-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.room-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.room-open{display:block;width:100%;text-align:left;background:none;border:0;color:var(--ink);padding:0;font:inherit;cursor:pointer}
+.room-icon{width:42px;height:42px;display:grid;place-items:center;background:var(--soft);border-radius:12px;font-size:1.35rem;margin-bottom:12px}
+.room-card h2{font-size:1.05rem;margin:0 0 4px;overflow-wrap:anywhere}
+.room-meta{color:var(--muted);font-size:.85rem;margin:0}
+
+.room-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.room-copy{min-width:0;flex:1}
+
+.progress-ring{
+  width:92px;
+  height:92px;
+  flex:0 0 92px;
+  display:block;
+}
+
+.progress-track{
+  fill:none;
+  stroke:var(--line);
+  stroke-width:9;
+}
+
+.progress-value{
+  fill:none;
+  stroke:var(--accent);
+  stroke-width:9;
+  stroke-linecap:round;
+  transition:stroke-dashoffset .35s ease;
+}
+
+.progress-inner{fill:var(--soft)}
+
+.progress-number{
+  font-size:22px;
+  font-weight:700;
+  fill:var(--ink);
+  text-anchor:middle;
+}
+
+.progress-caption{
+  font-size:8px;
+  fill:var(--muted);
+  text-anchor:middle;
+}
+.room-actions{display:flex;justify-content:flex-end;margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.back-btn{margin:0 0 8px;padding-left:0!important}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:430px){.room-grid{grid-template-columns:1fr}.create-room button{width:100%}}
+.msg{font-size:.9rem;color:var(--warn);margin:0 0 12px}.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100vw - 32px);z-index:10}.toast.on{opacity:1}
+@media(prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<section id="rooms-view">
+  <h1>My Rooms</h1>
+  <p class="sub">Create a separate space for every goal or type of work.</p>
+  <form id="create-room-form" class="create-room">
+    <label class="sr-only" for="room-name">Room name</label>
+    <input id="room-name" type="text" maxlength="50" placeholder="e.g. Cybersecurity, College, Fitness" required>
+    <button class="btn primary" type="submit">+ Create room</button>
+  </form>
+  <div id="rooms-list"></div>
+</section>
+
+<section id="workspace-view" hidden>
+  <button class="quiet back-btn" id="back-rooms" type="button">← All rooms</button>
+  <h1 id="room-title">Room</h1>
+  <p class="sub" id="today"></p>
+  <nav role="tablist" aria-label="Room views">
+    <button role="tab" data-tab="today" aria-selected="true">Today</button>
+    <button role="tab" data-tab="roadmaps" aria-selected="false">Roadmaps</button>
+  </nav>
+  <section id="v-today"></section>
+  <section id="v-roadmaps" hidden>
+    <div class="drop">
+      <p>Add up to 4 PDF roadmaps to this room.</p>
+      <label class="btn primary"><input type="file" id="file" accept="application/pdf" multiple>Choose PDFs</label>
+    </div>
+    <p class="msg" id="msg" hidden></p>
+    <div id="list"></div>
+  </section>
+</section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+'use strict';
+
+const MAX=4;
+const MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11,january:0,february:1,march:2,april:3,may:4,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
+const $=s=>document.querySelector(s);
+const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let currentRoomId=null;
+let S=load(),openIds=new Set(),tab='today',toastTimer;
+
+// Always start at the Rooms dashboard; saved rooms remain intact.
+currentRoomId=null;
+
+function normalizeRoadmaps(list){
+  (list||[]).forEach(r=>{
+    if(!Array.isArray(r.entries))r.entries=[];
+    if(!r.time)r.time='06:00';
+    if(r.lastFired===undefined)r.lastFired='';
+  });
+  return list||[];
+}
+
+function load(){
+  try{
+    const v=JSON.parse(localStorage.getItem('rm')||'{"roadmaps":[]}');
+
+    if(v&&Array.isArray(v.rooms)){
+      v.rooms.forEach(room=>{
+        if(!room.id)room.id='room'+Date.now()+Math.random();
+        if(!room.name)room.name='My Room';
+        room.roadmaps=normalizeRoadmaps(room.roadmaps);
+      });
+      return {rooms:v.rooms};
+    }
+
+    // Migrate the previous single-roadmap layout into a default room.
+    const oldRoadmaps=normalizeRoadmaps(v&&Array.isArray(v.roadmaps)?v.roadmaps:[]);
+    const rooms=oldRoadmaps.length
+      ?[{id:'room-default',name:'My Room',createdAt:Date.now(),roadmaps:oldRoadmaps}]
+      :[];
+    return {rooms};
+  }catch(error){
+    console.error('Could not load saved roadmap data:',error);
+    return {rooms:[]};
+  }
+}
+
+function save(){
+  try{
+    localStorage.setItem('rm',JSON.stringify({rooms:S.rooms,activeRoomId:currentRoomId}));
+  }catch{
+    toast('Could not save. Browser storage may be full or disabled.');
+  }
+}
+
+function currentRoom(){
+  return S.rooms.find(room=>room.id===currentRoomId)||null;
+}
+
+function roomRoadmaps(){
+  return currentRoom()?.roadmaps||[];
+}
+
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const parseISO=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+const addDays=(s,n)=>{const d=parseISO(s);d.setDate(d.getDate()+n);return iso(d);};
+const todayISO=()=>iso(new Date());
+const pretty=s=>parseISO(s).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
+
+async function setupWorker(){
+  if(window.pdfjsLib){
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+}
+
+async function pdfLines(file){
+  const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+  const out=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const items=(await(await pdf.getPage(p)).getTextContent()).items
+      .filter(i=>i.str.trim())
+      .map(i=>({s:i.str,x:i.transform[4],y:i.transform[5]}))
+      .sort((a,b)=>b.y-a.y||a.x-b.x);
+    let cur=null,y=null;
+    for(const it of items){
+      if(cur===null||Math.abs(it.y-y)>3){
+        if(cur!==null)out.push(cur);
+        cur=it.s;y=it.y;
+      }else cur+=' '+it.s;
+    }
+    if(cur!==null)out.push(cur);
+  }
+  return out;
+}
+
+const dayRe=/^\s*day\s*[-.]?\s*(\d{1,3})\s*[:\-–—.)]\s*(.+)$/i;
+const dateRe=/^\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?(?:,?\s+(\d{4}))?\s*[:\-–—.)]\s*(.+)$/i;
+const dateRe2=/^\s*([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\s*[:\-–—.)]\s*(.+)$/i;
+
+function parseLines(lines){
+  const out=[];
+  for(const raw of lines){
+    const line=raw.trim();
+    if(!line)continue;
+    let m;
+    if((m=dayRe.exec(line))){
+      out.push({kind:'day',n:+m[1],topic:m[2].trim()});
+      continue;
+    }
+    let d,mo,y,topic;
+    if((m=dateRe.exec(line))&&MON[m[2].toLowerCase()]!==undefined){
+      d=+m[1];mo=MON[m[2].toLowerCase()];y=m[3];topic=m[4];
+    }else if((m=dateRe2.exec(line))&&MON[m[1].toLowerCase()]!==undefined){
+      mo=MON[m[1].toLowerCase()];d=+m[2];y=m[3];topic=m[4];
+    }
+    if(topic!==undefined&&d>=1&&d<=31){
+      out.push({kind:'date',d,mo,y:y?+y:null,topic:topic.trim()});
+      continue;
+    }
+    if(out.length&&!/^\d+$/.test(line)&&out[out.length-1].topic.length<300){
+      out[out.length-1].topic+=' '+line;
+    }
+  }
+  return out;
+}
+
+function buildEntries(parsed,start){
+  const now=new Date();
+  return parsed.map(p=>{
+    let date;
+    if(p.kind==='day'){
+      date=addDays(start,p.n-1);
+    }else{
+      let year=p.y||now.getFullYear();
+      let dt=new Date(year,p.mo,p.d);
+      if(!p.y&&(now-dt)>1000*60*60*24*180)dt=new Date(year+1,p.mo,p.d);
+      date=iso(dt);
+    }
+    return {kind:p.kind,n:p.n,label:p.kind==='day'?'Day '+p.n:null,date,topic:p.topic,status:'pending'};
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+async function importFiles(files){
+  const room=currentRoom();
+  if(!room)return;
+
+  const msg=$('#msg');
+  msg.hidden=true;
+  const notes=[];
+
+  for(const file of files){
+    if(room.roadmaps.length>=MAX){
+      notes.push('This room already has 4 PDFs. Delete one from this room to add another.');
+      break;
+    }
+
+    if(file.type&&file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf')){
+      notes.push(file.name+': please choose a PDF file.');
+      continue;
+    }
+
+    try{
+      const parsed=parseLines(await pdfLines(file));
+      if(!parsed.length){
+        notes.push(file.name+': no days found. Use lines like “Day 1: Arrays” or “12 Nov: Arrays”.');
+        continue;
+      }
+
+      const id='r'+Date.now()+Math.floor(Math.random()*1000);
+      const start=todayISO();
+
+      room.roadmaps.push({
+        id,
+        name:file.name.replace(/\.pdf$/i,''),
+        time:'06:00',
+        start,
+        lastFired:'',
+        entries:buildEntries(parsed,start)
+      });
+      openIds.add(id);
+    }catch(error){
+      console.error(error);
+      notes.push(file.name+': could not read this PDF. Make sure it contains selectable text, not only scanned images.');
+    }
+  }
+
+  save();
+  render();
+
+  if(notes.length){
+    msg.textContent=notes.join(' ');
+    msg.hidden=false;
+  }
+}
+
+function skipToday(id){
+  const r=roomRoadmaps().find(x=>x.id===id);
+  if(!r)return;
+  const t=todayISO();
+  r.entries.forEach(e=>{
+    if(e.status==='pending'&&e.date>=t)e.date=addDays(e.date,1);
+  });
+  r.lastFired='';
+  save();
+  render();
+  toast('Skipped. Pending topics moved forward one day.');
+}
+
+function markDone(id,i){
+  const r=roomRoadmaps().find(x=>x.id===id);
+  if(!r||!r.entries[i])return;
+  r.entries[i].status='done';
+  save();
+  render();
+}
+
+async function notify(r,e){
+  if(!r||!e)return;
+  const title=r.name;
+  const body=(e.label?e.label+': ':'')+e.topic;
+
+  if('Notification'in window&&Notification.permission==='granted'){
+    try{
+      new Notification(title,{body,tag:r.id+'-'+todayISO()});
+    }catch{
+      toast(title+' — '+body);
+    }
+  }else{
+    toast(title+' — '+body);
+  }
+}
+
+async function requestNotificationPermission(){
+  if(!('Notification'in window)){
+    toast('Notifications are not supported by this browser.');
+    return false;
+  }
+  if(Notification.permission==='granted')return true;
+  if(Notification.permission==='denied'){
+    toast('Notifications are blocked. Allow them in your browser site settings.');
+    return false;
+  }
+  const p=await Notification.requestPermission();
+  if(p!=='granted')toast('Allow notifications in the browser prompt to receive reminders.');
+  return p==='granted';
+}
+
+function checkReminders(){
+  const now=new Date();
+  const hm=pad(now.getHours())+':'+pad(now.getMinutes());
+  const t=todayISO();
+  let changed=false;
+
+  for(const room of S.rooms){
+    for(const r of room.roadmaps){
+      const e=r.entries.find(x=>x.date===t&&x.status==='pending');
+      if(!e||r.lastFired===t||hm<r.time)continue;
+
+      r.lastFired=t;
+      changed=true;
+
+      if('Notification'in window&&Notification.permission==='granted'){
+        notify(r,e);
+      }else{
+        toast('Reminder time reached for '+room.name+' / '+r.name+'. Enable notifications and use Test notification.');
+      }
+    }
+  }
+  if(changed)save();
+}
+
+function enterRoom(id){
+  currentRoomId=id;
+  tab='today';
+  openIds.clear();
+  save();
+  render();
+}
+
+
+function renderRooms(){
+  const host = $('#rooms-list');
+
+  if(!S.rooms.length){
+    host.innerHTML =
+      '<p class="empty">No rooms yet. Create your first room above.</p>';
+    return;
+  }
+
+  host.innerHTML = '<div class="room-grid">' +
+    S.rooms.map(room => {
+      const count = room.roadmaps.length;
+
+      // Calculate progress separately for this room.
+      const topics = room.roadmaps.reduce(
+        (total, roadmap) => total + roadmap.entries.length, 0
+      );
+
+      const completed = room.roadmaps.reduce(
+        (total, roadmap) =>
+          total + roadmap.entries.filter(
+            entry => entry.status === 'done'
+          ).length,
+        0
+      );
+
+      const percent = topics
+        ? Math.round((completed / topics) * 100)
+        : 0;
+
+      // Circular ring geometry.
+      const radius = 42;
+      const circumference = 2 * Math.PI * radius;
+      const offset = circumference * (1 - percent / 100);
+
+      return `
+        <article class="room-card">
+          <button
+            class="room-open"
+            data-act="open-room"
+            data-room="${room.id}"
+          >
+            <div class="room-top">
+              <div class="room-copy">
+                <div class="room-icon">▦</div>
+
+                <h2>${esc(room.name)}</h2>
+
+                <p class="room-meta">
+                  ${count}/4 PDFs · ${topics} topics
+                </p>
+
+                <p class="room-meta">
+                  ${completed} completed · ${topics - completed} remaining
+                </p>
+              </div>
+
+              <svg
+                class="progress-ring"
+                viewBox="0 0 100 100"
+                role="img"
+                aria-label="${percent}% completed"
+              >
+                <!-- Uncompleted part of the circle -->
+                <circle
+                  class="progress-track"
+                  cx="50"
+                  cy="50"
+                  r="${radius}"
+                />
+
+                <!-- Completed part of the circle -->
+                <circle
+                  class="progress-value"
+                  cx="50"
+                  cy="50"
+                  r="${radius}"
+                  stroke-dasharray="${circumference}"
+                  stroke-dashoffset="${offset}"
+                  transform="rotate(-90 50 50)"
+                />
+
+                <!-- Inner circle -->
+                <circle
+                  class="progress-inner"
+                  cx="50"
+                  cy="50"
+                  r="32"
+                />
+
+                <!-- Percentage -->
+                <text
+                  class="progress-number"
+                  x="50"
+                  y="49"
+                >${percent}%</text>
+
+                <text
+                  class="progress-caption"
+                  x="50"
+                  y="63"
+                >completed</text>
+              </svg>
+            </div>
+          </button>
+
+          <div class="room-actions">
+            <button
+              class="quiet"
+              data-act="rename-room"
+              data-room="${room.id}"
+            >Rename</button>
+
+            <button
+              class="quiet"
+              data-act="delete-room"
+              data-room="${room.id}"
+            >Delete</button>
+          </div>
+        </article>
+      `;
+    }).join('') +
+  '</div>';
+}
+
+
+function render(){
+  const room=currentRoom();
+  $('#rooms-view').hidden=!!room;
+  $('#workspace-view').hidden=!room;
+
+  if(!room){
+    renderRooms();
+    return;
+  }
+
+  $('#room-title').textContent=room.name;
+  $('#today').textContent=new Date().toLocaleDateString(undefined,{
+    weekday:'long',day:'numeric',month:'long'
+  });
+
+  document.querySelectorAll('#workspace-view nav button').forEach(b=>{
+    b.setAttribute('aria-selected',String(b.dataset.tab===tab));
+  });
+
+  $('#v-today').hidden=tab!=='today';
+  $('#v-roadmaps').hidden=tab!=='roadmaps';
+
+  renderToday();
+  renderList();
+}
+
+function renderToday(){
+  const t=todayISO();
+  const roadmaps=roomRoadmaps();
+
+  if(!roadmaps.length){
+    $('#v-today').innerHTML='<p class="empty">This room is empty. Open Roadmaps to add up to 4 PDFs.</p>';
+    return;
+  }
+
+  $('#v-today').innerHTML=roadmaps.map(r=>{
+    const i=r.entries.findIndex(x=>x.date===t);
+
+    if(i<0){
+      const n=r.entries.find(x=>x.date>t&&x.status==='pending');
+      return `<div class="card">
+        <p class="rname">${esc(r.name)}</p>
+        <p class="topic">Nothing scheduled today</p>
+        ${n?`<p class="rname">Next: ${pretty(n.date)} — ${esc(n.topic)}</p>`:''}
+      </div>`;
+    }
+
+    const e=r.entries[i];
+    const head=`<p class="rname">${esc(r.name)}${e.label?' · '+e.label:''}</p>
+      <p class="topic">${esc(e.topic)}</p>`;
+
+    if(e.status==='done'){
+      return `<div class="card">${head}<span class="done-tag">Done for today</span></div>`;
+    }
+
+    return `<div class="card">${head}
+      <div class="row">
+        <button class="btn primary" data-act="done" data-id="${r.id}" data-i="${i}">Done</button>
+        <button class="btn" data-act="skip" data-id="${r.id}">Skip today</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderList(){
+  const roadmaps=roomRoadmaps();
+  if(!roadmaps.length){
+    $('#list').innerHTML='';
+    return;
+  }
+
+  $('#list').innerHTML=roadmaps.map(r=>{
+    const left=r.entries.filter(e=>e.status==='pending').length;
+    const hasDay=r.entries.some(e=>e.kind==='day');
+
+    return `<details data-id="${r.id}" ${openIds.has(r.id)?'open':''}>
+      <summary>${esc(r.name)}
+        <small>${r.entries.length} topics · ${left} left · reminder at ${esc(r.time)}</small>
+      </summary>
+      <div class="body">
+        <div class="fields">
+          <label>Reminder time
+            <input type="time" value="${esc(r.time)}" data-f="time" data-id="${r.id}">
+          </label>
+          ${hasDay?`<label>Day 1 starts on
+            <input type="date" value="${esc(r.start)}" data-f="start" data-id="${r.id}">
+          </label>`:''}
+        </div>
+        <div class="entries">
+          ${r.entries.map((e,i)=>`<div class="entry st-${e.status}">
+            <span class="d">${pretty(e.date)}</span>
+            <input type="text" value="${esc(e.topic)}" data-f="topic" data-id="${r.id}" data-i="${i}" aria-label="Topic for ${pretty(e.date)}">
+          </div>`).join('')}
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn" data-act="test" data-id="${r.id}">Test notification</button>
+          <button class="quiet" data-act="del" data-id="${r.id}">Delete PDF roadmap</button>
+        </div>
+      </div>
+    </details>`;
+  }).join('');
+}
+
+function toast(m){
+  const e=$('#toast');
+  e.textContent=m;
+  e.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>e.classList.remove('on'),3500);
+}
+
+$('#create-room-form').addEventListener('submit',ev=>{
+  ev.preventDefault();
+  const input=$('#room-name');
+  const name=input.value.trim();
+  if(!name)return;
+
+  const room={
+    id:'room'+Date.now()+Math.floor(Math.random()*1000),
+    name,
+    createdAt:Date.now(),
+    roadmaps:[]
+  };
+
+  S.rooms.push(room);
+  currentRoomId=null;
+  input.value='';
+  tab='today';
+  save();
+  render();
+  toast('Room created. Click its card to open it.');
+});
+
+$('#back-rooms').addEventListener('click',()=>{
+  currentRoomId=null;
+  save();
+  render();
+});
+
+document.addEventListener('click',async ev=>{
+  const tb=ev.target.closest('#workspace-view nav button');
+  if(tb){
+    tab=tb.dataset.tab;
+    render();
+    return;
+  }
+
+  const b=ev.target.closest('[data-act]');
+  if(!b)return;
+
+  if(b.dataset.act==='open-room'){
+    enterRoom(b.dataset.room);
+    return;
+  }
+
+  if(b.dataset.act==='rename-room'){
+    const room=S.rooms.find(x=>x.id===b.dataset.room);
+    if(!room)return;
+    const name=prompt('New room name:',room.name);
+    if(name&&name.trim()){
+      room.name=name.trim().slice(0,50);
+      save();
+      render();
+    }
+    return;
+  }
+
+  if(b.dataset.act==='delete-room'){
+    const room=S.rooms.find(x=>x.id===b.dataset.room);
+    if(!room)return;
+    if(confirm('Delete room “'+room.name+'” and all its PDFs/topics? This cannot be undone.')){
+      S.rooms=S.rooms.filter(x=>x.id!==room.id);
+      if(currentRoomId===room.id)currentRoomId=null;
+      save();
+      render();
+    }
+    return;
+  }
+
+  const id=b.dataset.id;
+  const r=roomRoadmaps().find(x=>x.id===id);
+
+  if(b.dataset.act==='done')markDone(id,+b.dataset.i);
+  if(b.dataset.act==='skip')skipToday(id);
+
+  if(b.dataset.act==='del'&&confirm('Delete this PDF roadmap?')){
+    const room=currentRoom();
+    if(room){
+      room.roadmaps=room.roadmaps.filter(x=>x.id!==id);
+      save();
+      render();
+    }
+  }
+
+  if(b.dataset.act==='test'){
+    const ok=await requestNotificationPermission();
+    if(!ok)return;
+    const e=r?.entries.find(x=>x.status==='pending')||r?.entries[0];
+    if(e)await notify(r,e);
+    else toast('This roadmap has no topics to notify you about.');
+  }
+});
+
+document.addEventListener('change',ev=>{
+  const el=ev.target;
+
+  if(el.id==='file'){
+    const files=[...el.files];
+    const room=currentRoom();
+
+    if(room&&room.roadmaps.length+files.length>MAX){
+      toast('This room can contain up to 4 PDFs. Extra files will be skipped.');
+    }
+
+    importFiles(files);
+    el.value='';
+    return;
+  }
+
+  const f=el.dataset.f;
+  if(!f)return;
+
+  const r=roomRoadmaps().find(x=>x.id===el.dataset.id);
+  if(!r)return;
+
+  if(f==='time'){
+    r.time=el.value||'06:00';
+    r.lastFired='';
+    toast('Reminder time saved: '+r.time+'. Keep this page open for scheduled reminders.');
+  }
+
+  if(f==='topic'){
+    const e=r.entries[+el.dataset.i];
+    if(e)e.topic=el.value;
+  }
+
+  if(f==='start'&&el.value){
+    r.start=el.value;
+    r.entries.forEach(e=>{
+      if(e.kind==='day')e.date=addDays(r.start,e.n-1);
+    });
+    r.entries.sort((a,b)=>a.date.localeCompare(b.date));
+    r.lastFired='';
+  }
+
+  save();
+  if(f!=='topic')render();
+});
+
+document.addEventListener('toggle',ev=>{
+  const d=ev.target;
+  if(d.tagName!=='DETAILS')return;
+  if(d.open)openIds.add(d.dataset.id);
+  else openIds.delete(d.dataset.id);
+},true);
+
+setupWorker().catch(console.error);
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      await navigator.serviceWorker.register('/sw.js');
+      console.log('Daily Roadmap service worker registered.');
+    } catch (error) {
+      console.error('Service worker registration failed:', error);
+    }
+  });
+}
+render();
+checkReminders();
+setInterval(checkReminders,5000);
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden){
+    render();
+    checkReminders();
+  }
+});
+window.addEventListener('focus',checkReminders);
+</script>
+</body>
+</html>

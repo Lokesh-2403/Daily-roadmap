@@ -1,0 +1,675 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f4f3">
+<title>Daily Roadmap</title>
+<style>
+:root{--bg:#f2f4f3;--surface:#fff;--ink:#1d2a33;--muted:#66747e;--line:#dde3e1;--accent:#4f7a6b;--accent-ink:#fff;--soft:#e6efeb;--warn:#a5532f;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#12171a;--surface:#1a2125;--ink:#e5eaec;--muted:#a1adb4;--line:#2a3338;--accent:#8db8a6;--accent-ink:#0f1f19;--soft:#212c2b;--warn:#d98d68;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:640px;margin:0 auto;padding:20px 16px 80px}
+h1{font-size:1.5rem;font-weight:650;letter-spacing:-.01em;margin:8px 0 2px}
+.sub{color:var(--muted);margin:0 0 20px;font-size:.95rem}
+nav{display:flex;gap:4px;background:var(--soft);padding:4px;border-radius:10px;margin-bottom:20px}
+nav button{flex:1;border:0;background:none;color:var(--muted);padding:9px;border-radius:7px;font:inherit;font-weight:550;cursor:pointer}
+nav button[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
+.rname{color:var(--muted);font-size:.9rem;margin:0}
+.topic{font-size:1.2rem;font-weight:600;margin:4px 0 14px;line-height:1.35}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button.btn,label.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 16px;border-radius:8px;font:inherit;font-weight:550;cursor:pointer;display:inline-block}
+button.primary,label.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.quiet{border:0;background:none;color:var(--muted);font:inherit;cursor:pointer;padding:6px 8px;border-radius:6px}
+button:focus-visible,input:focus-visible,summary:focus-visible,label.btn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.done-tag{color:var(--accent);font-weight:600}
+.drop{border:1.5px dashed var(--line);border-radius:12px;padding:22px 16px;text-align:center;margin-bottom:16px;color:var(--muted)}
+.drop input{display:none}
+.drop p{margin:0 0 12px}
+details{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:12px}
+summary{padding:14px 16px;cursor:pointer;font-weight:600;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary small{display:block;color:var(--muted);font-weight:400}
+.body{padding:0 16px 16px;border-top:1px solid var(--line)}
+.fields{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}
+.fields label{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+input[type=text],input[type=time],input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.entries{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.entry{display:grid;grid-template-columns:92px 1fr;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line);font-size:.9rem}
+.entry:last-child{border-bottom:0}
+.entry .d{color:var(--muted)}
+.entry input{width:100%;padding:5px 8px;font-size:.9rem}
+.entry.st-done{opacity:.55}
+.empty{color:var(--muted);text-align:center;padding:36px 8px}
+.msg{font-size:.9rem;color:var(--warn);margin:0 0 12px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100vw - 32px);z-index:10}
+.toast.on{opacity:1}
+@media(prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>Daily Roadmap</h1>
+<p class="sub" id="today"></p>
+<nav role="tablist" aria-label="Main views">
+<button role="tab" data-tab="today" aria-selected="true">Today</button>
+<button role="tab" data-tab="roadmaps" aria-selected="false">Roadmaps</button>
+</nav>
+<section id="v-today"></section>
+<section id="v-roadmaps" hidden>
+<div class="drop">
+<p>Add up to 4 roadmap PDFs. Each one becomes its own reminder.</p>
+<label class="btn primary"><input type="file" id="file" accept="application/pdf" multiple>Choose PDFs</label>
+</div>
+<p class="msg" id="msg" hidden></p>
+<div id="list"></div>
+</section>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+'use strict';
+
+const MAX = 4;
+
+const MON = {
+  jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,
+  sep:8,sept:8,oct:9,nov:10,dec:11,
+  january:0,february:1,march:2,april:3,may:4,june:5,
+  july:6,august:7,september:8,october:9,november:10,december:11
+};
+
+const $ = selector => document.querySelector(selector);
+
+const esc = value => String(value ?? '').replace(/[&<>"]/g, char => ({
+  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'
+}[char]));
+
+let S = load();
+let openIds = new Set();
+let tab = 'today';
+let toastTimer;
+
+function load() {
+  try {
+    const value = JSON.parse(localStorage.getItem('rm') || '{"roadmaps":[]}');
+
+    if (!value || !Array.isArray(value.roadmaps)) {
+      return {roadmaps:[]};
+    }
+
+    value.roadmaps.forEach(roadmap => {
+      if (!Array.isArray(roadmap.entries)) roadmap.entries = [];
+      if (!roadmap.time) roadmap.time = '06:00';
+      if (roadmap.lastFired === undefined) roadmap.lastFired = '';
+    });
+
+    return value;
+  } catch {
+    return {roadmaps:[]};
+  }
+}
+
+function save() {
+  try {
+    localStorage.setItem('rm', JSON.stringify(S));
+  } catch {
+    toast('Could not save. Browser storage may be full or disabled.');
+  }
+}
+
+const pad = number => String(number).padStart(2,'0');
+
+const iso = date =>
+  date.getFullYear() + '-' +
+  pad(date.getMonth()+1) + '-' +
+  pad(date.getDate());
+
+const parseISO = value => {
+  const [year,month,day] = value.split('-').map(Number);
+  return new Date(year,month-1,day);
+};
+
+const addDays = (value,number) => {
+  const date = parseISO(value);
+  date.setDate(date.getDate()+number);
+  return iso(date);
+};
+
+const todayISO = () => iso(new Date());
+
+const pretty = value => parseISO(value).toLocaleDateString(undefined,{
+  weekday:'short',day:'numeric',month:'short'
+});
+
+async function setupWorker() {
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+}
+
+async function pdfLines(file) {
+  const pdf = await pdfjsLib.getDocument({
+    data: await file.arrayBuffer()
+  }).promise;
+
+  const output = [];
+
+  for (let page = 1; page <= pdf.numPages; page++) {
+    const items = (await (await pdf.getPage(page)).getTextContent()).items
+      .filter(item => item.str.trim())
+      .map(item => ({
+        text:item.str,
+        x:item.transform[4],
+        y:item.transform[5]
+      }))
+      .sort((a,b) => b.y-a.y || a.x-b.x);
+
+    let current = null;
+    let y = null;
+
+    for (const item of items) {
+      if (current === null || Math.abs(item.y-y)>3) {
+        if (current !== null) output.push(current);
+        current = item.text;
+        y = item.y;
+      } else {
+        current += ' ' + item.text;
+      }
+    }
+
+    if (current !== null) output.push(current);
+  }
+
+  return output;
+}
+
+/* Accepted formats: Day 1: Arrays, 12 Nov: Arrays, Nov 12: Arrays. */
+const dayRe = /^\s*day\s*[-.]?\s*(\d{1,3})\s*[:\-–—.)]\s*(.+)$/i;
+
+const dateRe =
+  /^\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?(?:,?\s+(\d{4}))?\s*[:\-–—.)]\s*(.+)$/i;
+
+const dateRe2 =
+  /^\s*([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\s*[:\-–—.)]\s*(.+)$/i;
+
+function parseLines(lines) {
+  const output = [];
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+
+    let match;
+
+    if ((match = dayRe.exec(line))) {
+      output.push({
+        kind:'day',
+        n:+match[1],
+        topic:match[2].trim()
+      });
+      continue;
+    }
+
+    let day, month, year, topic;
+
+    if ((match = dateRe.exec(line)) &&
+        MON[match[2].toLowerCase()] !== undefined) {
+      day = +match[1];
+      month = MON[match[2].toLowerCase()];
+      year = match[3];
+      topic = match[4];
+    } else if ((match = dateRe2.exec(line)) &&
+               MON[match[1].toLowerCase()] !== undefined) {
+      month = MON[match[1].toLowerCase()];
+      day = +match[2];
+      year = match[3];
+      topic = match[4];
+    }
+
+    if (topic !== undefined && day >= 1 && day <= 31) {
+      output.push({
+        kind:'date',
+        day,
+        month,
+        year:year ? +year : null,
+        topic:topic.trim()
+      });
+      continue;
+    }
+
+    if (output.length &&
+        !/^\d+$/.test(line) &&
+        output[output.length-1].topic.length < 300) {
+      output[output.length-1].topic += ' ' + line;
+    }
+  }
+
+  return output;
+}
+
+function buildEntries(parsed,start) {
+  const now = new Date();
+
+  return parsed.map(item => {
+    let date;
+
+    if (item.kind === 'day') {
+      date = addDays(start,item.n-1);
+    } else {
+      let year = item.year || now.getFullYear();
+      let dateObject = new Date(year,item.month,item.day);
+
+      if (!item.year && (now-dateObject) > 1000*60*60*24*180) {
+        dateObject = new Date(year+1,item.month,item.day);
+      }
+
+      date = iso(dateObject);
+    }
+
+    return {
+      kind:item.kind,
+      n:item.n,
+      label:item.kind === 'day' ? 'Day ' + item.n : null,
+      date,
+      topic:item.topic,
+      status:'pending'
+    };
+  }).sort((a,b) => a.date.localeCompare(b.date));
+}
+
+async function importFiles(files) {
+  const message = $('#msg');
+  message.hidden = true;
+  const notes = [];
+
+  for (const file of files) {
+    if (S.roadmaps.length >= MAX) {
+      notes.push('Limit is ' + MAX + ' roadmaps. Delete one to add more.');
+      break;
+    }
+
+    if (file.type && file.type !== 'application/pdf' &&
+        !file.name.toLowerCase().endsWith('.pdf')) {
+      notes.push(file.name + ': please choose a PDF file.');
+      continue;
+    }
+
+    try {
+      const parsed = parseLines(await pdfLines(file));
+
+      if (!parsed.length) {
+        notes.push(file.name + ': no days found. Use lines like “Day 1: Arrays” or “12 Nov: Arrays”.');
+        continue;
+      }
+
+      const id = 'r' + Date.now() + Math.floor(Math.random()*1000);
+      const start = todayISO();
+
+      S.roadmaps.push({
+        id,
+        name:file.name.replace(/\.pdf$/i,''),
+        time:'06:00',
+        start,
+        lastFired:'',
+        entries:buildEntries(parsed,start)
+      });
+
+      openIds.add(id);
+    } catch (error) {
+      console.error(error);
+      notes.push(file.name + ': could not read this PDF. It should contain selectable text.');
+    }
+  }
+
+  save();
+  render();
+
+  if (notes.length) {
+    message.textContent = notes.join(' ');
+    message.hidden = false;
+  }
+}
+
+function skipToday(id) {
+  const roadmap = S.roadmaps.find(item => item.id === id);
+  if (!roadmap) return;
+
+  const today = todayISO();
+
+  roadmap.entries.forEach(entry => {
+    if (entry.status === 'pending' && entry.date >= today) {
+      entry.date = addDays(entry.date,1);
+    }
+  });
+
+  roadmap.lastFired = '';
+  save();
+  render();
+  toast('Skipped. Pending topics moved forward one day.');
+}
+
+function markDone(id,index) {
+  const roadmap = S.roadmaps.find(item => item.id === id);
+  if (!roadmap || !roadmap.entries[index]) return;
+
+  roadmap.entries[index].status = 'done';
+  save();
+  render();
+}
+
+async function notify(roadmap,entry) {
+  if (!roadmap || !entry) return;
+
+  const title = roadmap.name;
+  const body = (entry.label ? entry.label + ': ' : '') + entry.topic;
+
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification(title,{
+        body,
+        tag:roadmap.id + '-' + todayISO()
+      });
+    } catch {
+      toast(title + ' — ' + body);
+    }
+  } else {
+    toast(title + ' — ' + body);
+  }
+}
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    toast('Notifications are not supported by this browser.');
+    return false;
+  }
+
+  if (Notification.permission === 'granted') return true;
+
+  if (Notification.permission === 'denied') {
+    toast('Notifications are blocked. Allow them in your browser site settings.');
+    return false;
+  }
+
+  const permission = await Notification.requestPermission();
+
+  if (permission !== 'granted') {
+    toast('Allow notifications in the browser prompt to receive reminders.');
+  }
+
+  return permission === 'granted';
+}
+
+/*
+  Reminder fix:
+  - Only checks roadmaps that have a pending topic scheduled today.
+  - Records lastFired only when a reminder is due.
+  - Changing the reminder time resets lastFired.
+*/
+function checkReminders() {
+  const now = new Date();
+  const currentTime = pad(now.getHours()) + ':' + pad(now.getMinutes());
+  const today = todayISO();
+  let changed = false;
+
+  for (const roadmap of S.roadmaps) {
+    const entry = roadmap.entries.find(item =>
+      item.date === today && item.status === 'pending'
+    );
+
+    if (!entry) continue;
+    if (roadmap.lastFired === today) continue;
+    if (currentTime < roadmap.time) continue;
+
+    roadmap.lastFired = today;
+    changed = true;
+
+    if ('Notification' in window &&
+        Notification.permission === 'granted') {
+      notify(roadmap,entry);
+    } else {
+      toast('Reminder time reached for ' + roadmap.name +
+        '. Enable notifications and use Test notification.');
+    }
+  }
+
+  if (changed) save();
+}
+
+function render() {
+  $('#today').textContent = new Date().toLocaleDateString(undefined,{
+    weekday:'long',day:'numeric',month:'long'
+  });
+
+  document.querySelectorAll('nav button').forEach(button => {
+    button.setAttribute('aria-selected',
+      String(button.dataset.tab === tab));
+  });
+
+  $('#v-today').hidden = tab !== 'today';
+  $('#v-roadmaps').hidden = tab !== 'roadmaps';
+
+  renderToday();
+  renderList();
+}
+
+function renderToday() {
+  const today = todayISO();
+
+  if (!S.roadmaps.length) {
+    $('#v-today').innerHTML =
+      '<p class="empty">No roadmaps yet. Open Roadmaps and add a PDF.</p>';
+    return;
+  }
+
+  $('#v-today').innerHTML = S.roadmaps.map(roadmap => {
+    const index = roadmap.entries.findIndex(entry => entry.date === today);
+
+    if (index < 0) {
+      const next = roadmap.entries.find(entry =>
+        entry.date > today && entry.status === 'pending'
+      );
+
+      return `<div class="card">
+        <p class="rname">${esc(roadmap.name)}</p>
+        <p class="topic">Nothing scheduled today</p>
+        ${next ? `<p class="rname">Next: ${pretty(next.date)} — ${esc(next.topic)}</p>` : ''}
+      </div>`;
+    }
+
+    const entry = roadmap.entries[index];
+
+    const heading = `<p class="rname">${esc(roadmap.name)}${entry.label ? ' · ' + entry.label : ''}</p>
+      <p class="topic">${esc(entry.topic)}</p>`;
+
+    if (entry.status === 'done') {
+      return `<div class="card">${heading}<span class="done-tag">Done for today</span></div>`;
+    }
+
+    return `<div class="card">${heading}
+      <div class="row">
+        <button class="btn primary" data-act="done" data-id="${roadmap.id}" data-i="${index}">Done</button>
+        <button class="btn" data-act="skip" data-id="${roadmap.id}">Skip today</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderList() {
+  if (!S.roadmaps.length) {
+    $('#list').innerHTML = '';
+    return;
+  }
+
+  $('#list').innerHTML = S.roadmaps.map(roadmap => {
+    const left = roadmap.entries.filter(entry =>
+      entry.status === 'pending'
+    ).length;
+
+    const hasDay = roadmap.entries.some(entry => entry.kind === 'day');
+
+    return `<details data-id="${roadmap.id}" ${openIds.has(roadmap.id) ? 'open' : ''}>
+      <summary>${esc(roadmap.name)}
+        <small>${roadmap.entries.length} topics · ${left} left · reminder at ${esc(roadmap.time)}</small>
+      </summary>
+      <div class="body">
+        <div class="fields">
+          <label>Reminder time
+            <input type="time" value="${esc(roadmap.time)}" data-f="time" data-id="${roadmap.id}">
+          </label>
+          ${hasDay ? `<label>Day 1 starts on
+            <input type="date" value="${esc(roadmap.start)}" data-f="start" data-id="${roadmap.id}">
+          </label>` : ''}
+        </div>
+        <div class="entries">
+          ${roadmap.entries.map((entry,index) => `<div class="entry st-${entry.status}">
+            <span class="d">${pretty(entry.date)}</span>
+            <input type="text" value="${esc(entry.topic)}" data-f="topic" data-id="${roadmap.id}" data-i="${index}" aria-label="Topic for ${pretty(entry.date)}">
+          </div>`).join('')}
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn" data-act="test" data-id="${roadmap.id}">Test notification</button>
+          <button class="quiet" data-act="del" data-id="${roadmap.id}">Delete</button>
+        </div>
+      </div>
+    </details>`;
+  }).join('');
+}
+
+function toast(message) {
+  const element = $('#toast');
+  element.textContent = message;
+  element.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => element.classList.remove('on'),3500);
+}
+
+document.addEventListener('click',async event => {
+  const tabButton = event.target.closest('nav button');
+
+  if (tabButton) {
+    tab = tabButton.dataset.tab;
+    render();
+    return;
+  }
+
+  const button = event.target.closest('[data-act]');
+  if (!button) return;
+
+  const id = button.dataset.id;
+  const roadmap = S.roadmaps.find(item => item.id === id);
+
+  if (button.dataset.act === 'done') {
+    markDone(id,+button.dataset.i);
+  }
+
+  if (button.dataset.act === 'skip') {
+    skipToday(id);
+  }
+
+  if (button.dataset.act === 'del' &&
+      confirm('Delete this roadmap?')) {
+    S.roadmaps = S.roadmaps.filter(item => item.id !== id);
+    save();
+    render();
+  }
+
+  if (button.dataset.act === 'test') {
+    const allowed = await requestNotificationPermission();
+    if (!allowed) return;
+
+    const entry = roadmap?.entries.find(item =>
+      item.status === 'pending'
+    ) || roadmap?.entries[0];
+
+    if (entry) {
+      await notify(roadmap,entry);
+    } else {
+      toast('This roadmap has no topics to notify you about.');
+    }
+  }
+});
+
+document.addEventListener('change',event => {
+  const element = event.target;
+
+  if (element.id === 'file') {
+    importFiles([...element.files]);
+    element.value = '';
+    return;
+  }
+
+  const field = element.dataset.f;
+  if (!field) return;
+
+  const roadmap = S.roadmaps.find(item =>
+    item.id === element.dataset.id
+  );
+
+  if (!roadmap) return;
+
+  if (field === 'time') {
+    roadmap.time = element.value || '06:00';
+
+    // Let today's reminder fire at the newly selected time.
+    roadmap.lastFired = '';
+
+    toast('Reminder time saved: ' + roadmap.time +
+      '. Keep this page open for scheduled reminders.');
+  }
+
+  if (field === 'topic') {
+    const entry = roadmap.entries[+element.dataset.i];
+    if (entry) entry.topic = element.value;
+  }
+
+  if (field === 'start' && element.value) {
+    roadmap.start = element.value;
+
+    roadmap.entries.forEach(entry => {
+      if (entry.kind === 'day') {
+        entry.date = addDays(roadmap.start,entry.n-1);
+      }
+    });
+
+    roadmap.entries.sort((a,b) => a.date.localeCompare(b.date));
+    roadmap.lastFired = '';
+  }
+
+  save();
+
+  if (field !== 'topic') render();
+});
+
+document.addEventListener('toggle',event => {
+  const details = event.target;
+  if (details.tagName !== 'DETAILS') return;
+
+  if (details.open) openIds.add(details.dataset.id);
+  else openIds.delete(details.dataset.id);
+},true);
+
+setupWorker().catch(console.error);
+render();
+checkReminders();
+
+// Check every five seconds while this page is open.
+setInterval(checkReminders,5000);
+
+document.addEventListener('visibilitychange',() => {
+  if (!document.hidden) {
+    render();
+    checkReminders();
+  }
+});
+
+window.addEventListener('focus',checkReminders);
+</script>
+</body>
+</html>

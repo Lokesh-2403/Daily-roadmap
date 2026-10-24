@@ -1,0 +1,21 @@
+
+{
+  "id": "/",
+  "name": "Daily Roadmap",
+  "short_name": "Roadmap",
+  "description": "Organize your rooms, roadmaps, and daily tasks.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2f4f3",
+  "theme_color": "#4f7a6b",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
