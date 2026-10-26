@@ -82,18 +82,120 @@ details{background:var(--surface);border:1px solid var(--line);border-radius:12p
 @media(max-width:430px){.room-grid{grid-template-columns:1fr}.create-room button{width:100%}}
 .msg{font-size:.9rem;color:var(--warn);margin:0 0 12px}.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100vw - 32px);z-index:10}.toast.on{opacity:1}
 @media(prefers-reduced-motion:reduce){.toast{transition:none}}
+/* Account & Sync */
+#account-section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 0 0 22px;
+}
+
+#account-section h2 {
+  font-size: 1.05rem;
+  margin: 0 0 4px;
+}
+
+#account-section .account-description {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0 0 12px;
+}
+
+#account-status {
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+  margin: 0 0 12px;
+}
+
+#account-message {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 12px 0 0;
+  overflow-wrap: anywhere;
+}
+
+#account-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#account-controls button[hidden] {
+  display: none;
+}
 </style>
 </head>
 <body>
 <main>
+<div id="auth-loading" style="text-align:center;padding:60px 16px">
+  Checking your account...
+</div>
+
+<div id="app-content" hidden>
+
 <section id="rooms-view">
+
+  <!-- Account & Sync -->
+  <section id="account-section" aria-labelledby="account-heading">
+    <h2 id="account-heading">Account &amp; Sync</h2>
+
+    <p class="account-description">
+      Sign in with Google to access your account.
+    </p>
+
+    <p id="account-status" aria-live="polite">
+      Checking account status...
+    </p>
+
+    <div id="account-controls">
+      <button
+        class="btn primary"
+        id="google-sign-in"
+        type="button"
+      >
+        Continue with Google
+      </button>
+
+      <button
+        class="btn"
+        id="google-sign-out"
+        type="button"
+        hidden
+      >
+        Sign out
+      </button>
+      <button
+  class="btn primary"
+  id="enable-notifications"
+  type="button"
+  hidden
+>
+  Enable Notifications
+</button>
+    </div>
+
+    <p id="account-message" role="status">
+      Your existing roadmaps remain stored locally on this device.
+      Cloud sync has not been enabled yet.
+    </p>
+  </section>
+
   <h1>My Rooms</h1>
   <p class="sub">Create a separate space for every goal or type of work.</p>
+
   <form id="create-room-form" class="create-room">
     <label class="sr-only" for="room-name">Room name</label>
-    <input id="room-name" type="text" maxlength="50" placeholder="e.g. Cybersecurity, College, Fitness" required>
+    <input
+      id="room-name"
+      type="text"
+      maxlength="50"
+      placeholder="e.g. Cybersecurity, College, Fitness"
+      required
+    >
     <button class="btn primary" type="submit">+ Create room</button>
   </form>
+
   <div id="rooms-list"></div>
 </section>
 
@@ -115,6 +217,7 @@ details{background:var(--surface);border:1px solid var(--line);border-radius:12p
     <div id="list"></div>
   </section>
 </section>
+</div>
 </main>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -167,21 +270,89 @@ function load(){
   }
 }
 
-function save(){
-  try{
-    localStorage.setItem('rm',JSON.stringify({rooms:S.rooms,activeRoomId:currentRoomId}));
-  }catch{
-    toast('Could not save. Browser storage may be full or disabled.');
+
+function save() {
+  try {
+    const snapshot = {
+      rooms: S.rooms,
+      activeRoomId: currentRoomId
+    };
+
+    // Save locally only when cloud sync is not active.
+    if (!window.dayymarkkCloudAccountUid) {
+      localStorage.setItem('rm', JSON.stringify(snapshot));
+    }
+
+    // Sync to the signed-in Google account when ready.
+    if (
+      window.dayymarkkCloudReady &&
+      typeof window.dayymarkkCloudSave === 'function'
+    ) {
+      window.dayymarkkCloudSave(snapshot);
+    }
+  } catch (error) {
+    console.error('Could not save roadmap data:', error);
+    toast('Could not save your roadmap. Please try again.');
   }
 }
+
 
 function currentRoom(){
   return S.rooms.find(room=>room.id===currentRoomId)||null;
 }
 
+
+
 function roomRoadmaps(){
   return currentRoom()?.roadmaps||[];
 }
+
+// Paste the new bridge here
+
+window.dayymarkkRoadmaps = {
+  setCloudState(rooms) {
+    S = {
+      rooms: Array.isArray(rooms)
+        ? rooms.map(room => ({
+            ...room,
+            roadmaps: normalizeRoadmaps(room.roadmaps)
+          }))
+        : []
+    };
+
+    currentRoomId = null;
+    openIds.clear();
+    tab = 'today';
+
+    render();
+
+    const loading = document.getElementById('auth-loading');
+    const content = document.getElementById('app-content');
+
+    if (loading) loading.hidden = true;
+    if (content) content.hidden = false;
+  },
+
+  clearSignedOutState() {
+    // Clear only the visible, in-memory data.
+    // Do not delete anything from Firestore.
+    S = { rooms: [] };
+    currentRoomId = null;
+    openIds.clear();
+    tab = 'today';
+
+    render();
+
+    const loading = document.getElementById('auth-loading');
+    const content = document.getElementById('app-content');
+
+    if (loading) loading.hidden = true;
+    if (content) content.hidden = false;
+  }
+};
+
+
+
 
 const pad=n=>String(n).padStart(2,'0');
 const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
@@ -784,6 +955,7 @@ document.addEventListener('toggle',ev=>{
 },true);
 
 setupWorker().catch(console.error);
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
@@ -794,16 +966,37 @@ if ('serviceWorker' in navigator) {
     }
   });
 }
-render();
-checkReminders();
-setInterval(checkReminders,5000);
-document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden){
+
+// Wait until Firebase has checked the account before rendering.
+window.dayymarkkInitialAuthReady = false;
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && window.dayymarkkInitialAuthReady) {
     render();
     checkReminders();
   }
 });
-window.addEventListener('focus',checkReminders);
+
+window.addEventListener('focus', () => {
+  if (window.dayymarkkInitialAuthReady) {
+    checkReminders();
+  }
+});
+setInterval(() => {
+  if (
+    !document.hidden &&
+    window.dayymarkkInitialAuthReady
+  ) {
+    checkReminders();
+  }
+}, 5000);
+
+// Do not render old local rooms here.
+// Firebase will load the correct account's rooms.
+
 </script>
+
+<script type="module" src="/src/firebase-init.js"></script>
+<script type="module" src="/src/firebase-auth-ui.js"></script>
 </body>
 </html>

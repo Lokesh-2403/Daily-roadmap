@@ -1,5 +1,6 @@
 
 const CACHE_NAME = 'daily-roadmap-v1';
+
 const APP_FILES = [
   '/',
   '/manifest.webmanifest',
@@ -8,29 +9,41 @@ const APP_FILES = [
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_FILES))
+    caches.open(CACHE_NAME).then(cache =>
+      cache.addAll(APP_FILES)
+    )
   );
+
   self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key.startsWith('daily-roadmap-') && key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      )
-    )
+    Promise.all([
+      caches.keys().then(keys =>
+        Promise.all(
+          keys
+            .filter(
+              key =>
+                key.startsWith('daily-roadmap-') &&
+                key !== CACHE_NAME
+            )
+            .map(key => caches.delete(key))
+        )
+      ),
+      self.clients.claim()
+    ])
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
 
-  if (request.method !== 'GET' || url.origin !== self.location.origin) {
+  if (
+    request.method !== 'GET' ||
+    url.origin !== self.location.origin
+  ) {
     return;
   }
 
@@ -45,43 +58,104 @@ self.addEventListener('fetch', event => {
   }
 });
 
+// Display compatible push messages, including Firebase-style payloads.
 self.addEventListener('push', event => {
-  let data = {
-    title: 'Daily Roadmap',
-    body: 'You have a roadmap task to check.'
-  };
+  let payload = {};
 
   if (event.data) {
     try {
-      data = { ...data, ...event.data.json() };
+      payload = event.data.json();
     } catch {
-      data.body = event.data.text();
+      payload = {
+        body: event.data.text()
+      };
     }
   }
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/icon.svg',
-      badge: '/icon.svg',
-      data: { url: data.url || '/' }
-    })
-  );
+  const notification = payload.notification || {};
+  const data = payload.data || {};
+
+  const title =
+    notification.title ||
+    payload.title ||
+    data.title ||
+    'Dayymarkk';
+
+  const body =
+    notification.body ||
+    payload.body ||
+    data.body ||
+    'You have a roadmap task to check.';
+
+  const requestedUrl =
+    data.url ||
+    payload.url ||
+    '/';
+
+  let safeUrl = self.location.origin + '/';
+
+  try {
+    const targetUrl = new URL(
+      requestedUrl,
+      self.location.origin
+    );
+
+    if (targetUrl.origin === self.location.origin) {
+      safeUrl = targetUrl.href;
+    }
+  } catch {
+    // Keep the safe default URL.
+  }
+
+event.waitUntil(
+  self.registration.showNotification(title, {
+    body,
+    icon: '/icon.svg',
+    badge: '/icon.svg',
+    data: {
+      url: safeUrl
+    }
+  })
+);
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
-  const target = new URL(
-    event.notification.data?.url || '/',
-    self.location.origin
-  ).href;
+  let target = self.location.origin + '/';
+
+  try {
+    const targetUrl = new URL(
+      event.notification.data?.url || '/',
+      self.location.origin
+    );
+
+    if (targetUrl.origin === self.location.origin) {
+      target = targetUrl.href;
+    }
+  } catch {
+    // Keep the safe default URL.
+  }
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then(clients => {
-        const existing = clients.find(client => client.url === target);
-        if (existing) return existing.focus();
+    self.clients
+      .matchAll({
+        type: 'window',
+        includeUncontrolled: true
+      })
+      .then(async clients => {
+        const existing = clients.find(client => {
+          try {
+            return new URL(client.url).href === target;
+          } catch {
+            return false;
+          }
+        });
+
+        if (existing) {
+          return existing.focus();
+        }
+
         return self.clients.openWindow(target);
       })
   );
